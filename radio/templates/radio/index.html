@@ -1,0 +1,180 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Permissions-Policy" content="autoplay=*" />
+  <title>Rádio Online</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      margin-top: 50px;
+    }
+    .container {
+      margin-top: 20px;
+      padding: 0 20px;
+    }
+    .radio-status {
+      font-size: 18px;
+      margin: 20px 0;
+    }
+    .musica-info {
+      font-size: 16px;
+      margin-top: 10px;
+    }
+    .album-cover {
+      margin: 20px 0;
+      max-width: 300px;
+      max-height: 300px;
+      border-radius: 10px;
+      width: 100%;
+      height: auto;
+    }
+    #audio-player {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bem-vindo à Rádio Online!</h1>
+  <div class="container">
+    <div class="radio-status" role="status" aria-live="polite">
+      <p id="status">Carregando status da rádio...</p>
+    </div>
+    <div class="musica-info">
+      <img id="capa" class="album-cover"
+           src="https://via.placeholder.com/300?text=Sem+Capa"
+           alt="Capa do álbum"
+           width="300" height="300" />
+      <p id="musica">–</p>
+      <p id="artista">–</p>
+    </div>
+
+    <audio id="audio-player" autoplay muted preload="auto">
+      <source id="audio-source" src="" type="audio/mpeg" />
+      Seu navegador não suporta áudio HTML5.
+    </audio>
+  </div>
+
+  <script>
+    const audioPlayer = document.getElementById("audio-player");
+    const POLLING_INTERVAL = 5000;
+    let ultimoStatus = null;
+    let tentandoTocar = true;
+
+    audioPlayer.volume = 1.0;
+
+    function formatarTempo(segundos) {
+      const m = Math.floor(segundos / 60).toString().padStart(2, '0');
+      const s = Math.floor(segundos % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    async function atualizarDoServidor() {
+      try {
+        const resp = await fetch('/status');
+
+        if (!resp.ok) {
+          document.getElementById("status").textContent = `Erro HTTP: ${resp.status}`;
+          return;
+        }
+
+        const texto = await resp.text();
+        let data;
+        try {
+          data = JSON.parse(texto);
+        } catch (e) {
+          document.getElementById("status").textContent = "Resposta inválida do servidor: " + texto;
+          return;
+        }
+
+        let elapsed = Number(data.tempo_decorrido);
+        if (!Number.isFinite(elapsed) || elapsed < 0) elapsed = 0;
+
+        document.getElementById("status").textContent =
+          `${data.estilo} | Tocando há ${formatarTempo(elapsed)}`;
+
+        const chaveNova = JSON.stringify({
+          tipo: data.tipo,
+          url: data.url,
+          nome: data.nome,
+          artista: data.artista,
+          capa: data.capa,
+          estilo: data.estilo
+        });
+
+        if (data.tipo === 'vinheta') {
+          document.getElementById("capa").src = "https://via.placeholder.com/300?text=Vinheta";
+          document.getElementById("capa").alt = "Vinheta";
+          document.getElementById("musica").textContent = "Vinheta...";
+          document.getElementById("artista").textContent = "";
+        } else {
+          document.getElementById("capa").src = data.capa || "https://via.placeholder.com/300?text=Sem+Capa";
+          document.getElementById("capa").alt = `Capa de ${data.artista}`;
+          document.getElementById("musica").textContent = `Música: ${data.nome}`;
+          document.getElementById("artista").textContent = `Artista: ${data.artista}`;
+        }
+
+        if (!ultimoStatus || ultimoStatus !== chaveNova) {
+          const audioSource = document.getElementById("audio-source");
+          audioSource.src = data.url;
+
+          audioPlayer.onloadedmetadata = () => {
+            audioPlayer.currentTime = elapsed;
+            tentarReproduzir();
+          };
+
+          audioPlayer.load();
+          ultimoStatus = chaveNova;
+        } else {
+          const diff = Math.abs(audioPlayer.currentTime - elapsed);
+          if (diff > 1.0) {
+            audioPlayer.currentTime = elapsed;
+          }
+        }
+
+      } catch (err) {
+        console.error("Erro ao obter status:", err);
+        document.getElementById("status").textContent = "Erro ao obter status da rádio.";
+      }
+    }
+
+    function tentarReproduzir() {
+      if (!tentandoTocar) return;
+
+      audioPlayer.play().then(() => {
+        tentandoTocar = false;
+        audioPlayer.muted = false; // Ativa o som após sucesso
+      }).catch(() => {
+        // Tentativa falhou; aguardar mais interações ou tentar novamente depois
+      });
+    }
+
+    window.addEventListener("load", () => {
+      setInterval(atualizarDoServidor, POLLING_INTERVAL);
+      atualizarDoServidor();
+
+      const loop = setInterval(() => {
+        if (!tentandoTocar) {
+          clearInterval(loop);
+          return;
+        }
+        tentarReproduzir();
+      }, 1000);
+    });
+
+    // Tentativa adicional no primeiro clique do usuário
+    document.addEventListener("pointerdown", () => {
+      tentarReproduzir();
+    }, { once: true });
+  </script>
+</body>
+</html>

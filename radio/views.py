@@ -1,0 +1,275 @@
+import os
+import random
+import time
+import requests
+import subprocess
+import json
+from datetime import datetime, timedelta
+from threading import Thread, Event, Lock
+
+from django.conf import settings
+from django.http import JsonResponse
+from django.shortcuts import render
+
+
+# Renderiza a página principal da rádio
+def home(request):
+    return render(request, 'radio/index.html')
+
+
+# ——————————————————————————————————————————————
+# CONFIGURAÇÕES GLOBAIS
+# ——————————————————————————————————————————————
+
+LASTFM_API_KEY = '9d7d79a952c5e5805a0decb0ccf1c9fd'
+
+# Caminho relativo dentro da pasta static do app "radio"
+vinhetas = [
+    "vinhetas/vinheta_milenio.mp3",
+    "vinhetas/vinheta_rock.mp3",
+    "vinhetas/uma_hora.mp3"
+]
+
+cronograma = [
+    {"estilo": "brazilian rock",   "duracao": 3},
+    {"estilo": "alternative rock", "duracao": 3},
+    {"estilo": "metalcore",        "duracao": 3},
+    {"estilo": "alt-rock",         "duracao": 3},
+    {"estilo": "indie rock",       "duracao": 3},
+    {"estilo": "brazilian rock",   "duracao": 3},
+]
+
+status_lock = Lock()
+status_data = {
+    "tipo": None,
+    "url": None,
+    "nome": None,
+    "artista": None,
+    "capa": None,
+    "estilo": None,
+    "start_time": None
+}
+
+cronograma_index = 0
+
+
+# ——————————————————————————————————————————————
+# FUNÇÕES AUXILIARES
+# ——————————————————————————————————————————————
+
+def buscar_musicas_por_estilo(estilo):
+    url = (
+        f'http://ws.audioscrobbler.com/2.0/'
+        f'?method=tag.gettoptracks'
+        f'&tag={requests.utils.quote(estilo)}'
+        f'&api_key={LASTFM_API_KEY}'
+        f'&format=json'
+    )
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        tracks = data.get('tracks', {}).get('track', [])
+        if tracks:
+            return [(t['name'], t['artist']['name']) for t in tracks]
+    except Exception as e:
+        print(f"[ERRO] buscar_musicas_por_estilo: {e}")
+    return []
+
+
+def download_music(music_name, artist_name, result_container):
+    sanitized = f"{artist_name} - {music_name}"
+    for c in ["/", "\\", ":", "!", "?", '"', "'"]:
+        sanitized = sanitized.replace(c, "_")
+
+    output_dir = os.path.join(settings.BASE_DIR, 'radio', 'static', 'musicas')
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"{sanitized}.mp3")
+
+    if os.path.exists(output_path):
+        result_container["path"] = output_path
+        return True
+
+    ydl_opts = {
+        'quiet': True,
+        'extract_audio': True,
+        'format': 'bestaudio/best',
+        'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+        'noplaylist': True,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+    }
+
+    def attempt(query):
+        from yt_dlp import YoutubeDL
+        try:
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"ytsearch:{query}", download=True)
+                if 'entries' in info and info['entries']:
+                    video = info['entries'][0]
+                    temp_file = ydl.prepare_filename(video)
+                    # temp_file deve ser o arquivo mp3 após postprocessing
+                    if not temp_file.endswith('.mp3'):
+                        temp_file = os.path.splitext(temp_file)[0] + '.mp3'
+                    if os.path.exists(temp_file):
+                        os.rename(temp_file, output_path)
+                        result_container["path"] = output_path
+                        return True
+        except Exception as e:
+            print(f"[ERRO] download_music attempt '{query}': {e}")
+        return False
+
+    queries = [
+        f"{music_name} {artist_name} official music video",
+        f"{music_name} {artist_name} official audio",
+        f"{music_name} {artist_name}"
+    ]
+
+    for q in queries:
+        if attempt(q):
+            return True
+
+    result_container["path"] = None
+    return False
+
+
+def buscar_capa_do_album(musica, artista):
+    url = (
+        f"http://ws.audioscrobbler.com/2.0/"
+        f"?method=track.getInfo"
+        f"&api_key={LASTFM_API_KEY}"
+        f"&artist={requests.utils.quote(artista)}"
+        f"&track={requests.utils.quote(musica)}"
+        f"&format=json"
+    )
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        album = data.get('track', {}).get('album', {})
+        images = album.get('image', [])
+        if images:
+            # Usar a maior imagem disponível (última da lista)
+            for img in reversed(images):
+                if img.get('#text'):
+                    return img['#text']
+    except Exception as e:
+        print(f"[ERRO] buscar_capa_do_album: {e}")
+    return "https://via.placeholder.com/300?text=Sem+Capa"
+
+
+def obter_duracao_arquivo(audio_path):
+    try:
+        cmd = [
+            'ffprobe', '-v', 'error',
+            '-print_format', 'json',
+            '-show_entries', 'format=duration',
+            audio_path
+        ]
+        p = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        info = json.loads(p.stdout)
+        return float(info['format']['duration'])
+    except Exception as e:
+        print(f"[ERRO] obter_duracao_arquivo: {e}")
+        return 180.0  # duração padrão
+
+
+# ——————————————————————————————————————————————
+# LÓGICA PRINCIPAL DA RÁDIO
+# ——————————————————————————————————————————————
+
+def rodar_programa(estilo, duracao_minutos):
+    global status_data
+    fim_programa = datetime.now() + timedelta(minutes=duracao_minutos)
+
+    while datetime.now() < fim_programa:
+        musicas = buscar_musicas_por_estilo(estilo)
+        if not musicas:
+            time.sleep(5)
+            continue
+
+        musica, artista = random.choice(musicas)
+        vinheta_rel = random.choice(vinhetas)
+
+        cont = {"path": None}
+        sucesso = download_music(musica, artista, cont)
+        if not sucesso or not cont["path"]:
+            print(f"[RÁDIO] Falha ao baixar '{musica}' de {artista}. Pulando...")
+            time.sleep(5)
+            continue
+
+        music_path = cont["path"].replace("\\", "/")
+        vinheta_path = os.path.join(settings.BASE_DIR, 'radio', 'static', vinheta_rel).replace("\\", "/")
+
+        with status_lock:
+            status_data.update({
+                "tipo": "vinheta",
+                "url": f"static/{vinheta_rel}",
+                "nome": None,
+                "artista": None,
+                "estilo": estilo,
+                "capa": None,
+                "start_time": datetime.now(),
+            })
+
+        duracao_vinheta = obter_duracao_arquivo(vinheta_path)
+        time.sleep(duracao_vinheta)
+
+        capa_url = buscar_capa_do_album(musica, artista)
+
+        with status_lock:
+            status_data.update({
+                "tipo": "musica",
+                "url": f"static/musicas/{os.path.basename(music_path)}",
+                "nome": musica,
+                "artista": artista,
+                "estilo": estilo,
+                "capa": capa_url,
+                "start_time": datetime.now(),
+            })
+
+        duracao_musica = obter_duracao_arquivo(music_path)
+        time.sleep(duracao_musica)
+
+
+def ciclo_cronograma():
+    global cronograma_index
+    while True:
+        if cronograma_index >= len(cronograma):
+            cronograma_index = 0
+        prog = cronograma[cronograma_index]
+        cronograma_index += 1
+        rodar_programa(prog["estilo"], prog["duracao"])
+        time.sleep(1)
+
+
+# Inicializa a thread da rádio (garantir que só inicie uma vez)
+thread_radio = Thread(target=ciclo_cronograma, daemon=True)
+thread_radio.start()
+
+
+# ——————————————————————————————————————————————
+# VIEWS
+# ——————————————————————————————————————————————
+
+def rota_status(request):
+    with status_lock:
+        st = status_data.copy()
+
+    if st["start_time"]:
+        elapsed = (datetime.now() - st["start_time"]).total_seconds()
+    else:
+        elapsed = 0
+
+    return JsonResponse({
+        "tipo": st["tipo"],
+        "url": st["url"],
+        "nome": st["nome"],
+        "artista": st["artista"],
+        "capa": st["capa"],
+        "estilo": st["estilo"],
+        "tempo_decorrido": elapsed
+    })
