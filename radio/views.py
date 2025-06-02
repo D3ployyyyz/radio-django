@@ -2,6 +2,7 @@ import os
 import random
 import time
 import requests
+import subprocess
 import json
 from datetime import datetime, timedelta
 from threading import Thread, Lock
@@ -10,9 +11,6 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
 
-from mutagen import File  # biblioteca para ler metadados de áudio sem ffmpeg
-
-# Configurações
 LASTFM_API_KEY = '9d7d79a952c5e5805a0decb0ccf1c9fd'
 
 VINHETAS = [
@@ -43,7 +41,6 @@ status_data = {
 
 cronograma_index = 0
 
-# Views
 def home(request):
     return render(request, 'radio/index.html')
 
@@ -63,7 +60,6 @@ def rota_status(request):
         "tempo_decorrido": elapsed
     })
 
-# Funções Auxiliares
 def buscar_musicas_por_estilo(estilo):
     url = (
         f'http://ws.audioscrobbler.com/2.0/'
@@ -100,13 +96,15 @@ def download_music(music_name, artist_name, result_container):
     ydl_opts = {
         'quiet': True,
         'format': 'bestaudio/best',
-        'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+        'outtmpl': os.path.join(output_dir, sanitized + '.%(ext)s'),
         'noplaylist': True,
-        'extractaudio': True,
-        'audioformat': 'mp3',
-        'audioquality': 192,
-        'prefer_ffmpeg': False,  # evitar usar ffmpeg
-        'nocheckcertificate': True,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+        # evita cache para garantir sempre download atualizado
+        'cachedir': False,
     }
 
     queries = [
@@ -118,22 +116,20 @@ def download_music(music_name, artist_name, result_container):
     for query in queries:
         try:
             with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(f"ytsearch:{query}", download=True)
+                info = ydl.extract_info(f"ytsearch1:{query}", download=True)
                 if 'entries' in info and info['entries']:
                     video = info['entries'][0]
-                    temp_file = ydl.prepare_filename(video)
-                    # tenta localizar arquivo com extensões comuns
-                    if not os.path.exists(temp_file):
-                        for ext in ['.mp3', '.m4a', '.webm']:
-                            alt_file = os.path.splitext(temp_file)[0] + ext
-                            if os.path.exists(alt_file):
-                                temp_file = alt_file
-                                break
-
-                    # renomear para .mp3 pode ser problemático se não for mp3
-                    # mas vamos salvar como está para garantir reprodução
-                    result_container["path"] = temp_file
-                    return True
+                    # caminho do arquivo mp3 esperado
+                    expected_file = os.path.join(output_dir, sanitized + '.mp3')
+                    if os.path.exists(expected_file):
+                        result_container["path"] = expected_file
+                        return True
+                    else:
+                        # remove arquivos de outras extensões baixados para evitar confusão
+                        for ext in ['.webm', '.m4a', '.opus', '.mp4']:
+                            f = os.path.join(output_dir, sanitized + ext)
+                            if os.path.exists(f):
+                                os.remove(f)
         except Exception as e:
             print(f"[ERRO] download_music attempt '{query}': {e}")
 
@@ -164,17 +160,22 @@ def buscar_capa_do_album(musica, artista):
 
 def obter_duracao_arquivo(audio_path):
     try:
-        audio = File(audio_path)
-        if audio is not None and audio.info is not None:
-            return audio.info.length
-        else:
-            print(f"[ERRO] obter_duracao_arquivo: arquivo sem info de duração: {audio_path}")
-            return 180.0
+        cmd = [
+            'ffprobe', '-v', 'error',
+            '-print_format', 'json',
+            '-show_entries', 'format=duration',
+            audio_path
+        ]
+        p = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        info = json.loads(p.stdout)
+        duration = float(info['format']['duration'])
+        if duration < 1.0:
+            raise ValueError("Duração inválida")
+        return duration
     except Exception as e:
-        print(f"[ERRO] obter_duracao_arquivo: {e}")
-        return 180.0  # duração padrão
+        print(f"[ERRO] obter_duracao_arquivo: {e} - arquivo: {audio_path}")
+        return 180.0  # fallback padrão
 
-# Lógica Principal
 def rodar_programa(estilo, duracao_minutos):
     global status_data
     fim_programa = datetime.now() + timedelta(minutes=duracao_minutos)
@@ -197,6 +198,12 @@ def rodar_programa(estilo, duracao_minutos):
 
         music_path = cont["path"].replace("\\", "/")
         vinheta_path = os.path.join(settings.BASE_DIR, 'radio', 'static', vinheta_rel).replace("\\", "/")
+
+        # Checar se vinheta existe
+        if not os.path.exists(vinheta_path):
+            print(f"[ERRO] Vinheta não encontrada: {vinheta_path}")
+            time.sleep(5)
+            continue
 
         with status_lock:
             status_data.update({
@@ -238,6 +245,5 @@ def ciclo_cronograma():
         rodar_programa(prog["estilo"], prog["duracao"])
         time.sleep(1)
 
-# Inicializa a thread da rádio
 thread_radio = Thread(target=ciclo_cronograma, daemon=True)
 thread_radio.start()
