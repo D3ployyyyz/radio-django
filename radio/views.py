@@ -2,7 +2,6 @@ import os
 import random
 import time
 import requests
-import subprocess
 import json
 from datetime import datetime, timedelta
 from threading import Thread, Lock
@@ -10,6 +9,8 @@ from threading import Thread, Lock
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
+
+from mutagen import File  # biblioteca para ler metadados de áudio sem ffmpeg
 
 # Configurações
 LASTFM_API_KEY = '9d7d79a952c5e5805a0decb0ccf1c9fd'
@@ -98,15 +99,14 @@ def download_music(music_name, artist_name, result_container):
 
     ydl_opts = {
         'quiet': True,
-        'extract_audio': True,
         'format': 'bestaudio/best',
         'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
         'noplaylist': True,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
+        'extractaudio': True,
+        'audioformat': 'mp3',
+        'audioquality': 192,
+        'prefer_ffmpeg': False,  # evitar usar ffmpeg
+        'nocheckcertificate': True,
     }
 
     queries = [
@@ -122,12 +122,18 @@ def download_music(music_name, artist_name, result_container):
                 if 'entries' in info and info['entries']:
                     video = info['entries'][0]
                     temp_file = ydl.prepare_filename(video)
-                    if not temp_file.endswith('.mp3'):
-                        temp_file = os.path.splitext(temp_file)[0] + '.mp3'
-                    if os.path.exists(temp_file):
-                        os.rename(temp_file, output_path)
-                        result_container["path"] = output_path
-                        return True
+                    # tenta localizar arquivo com extensões comuns
+                    if not os.path.exists(temp_file):
+                        for ext in ['.mp3', '.m4a', '.webm']:
+                            alt_file = os.path.splitext(temp_file)[0] + ext
+                            if os.path.exists(alt_file):
+                                temp_file = alt_file
+                                break
+
+                    # renomear para .mp3 pode ser problemático se não for mp3
+                    # mas vamos salvar como está para garantir reprodução
+                    result_container["path"] = temp_file
+                    return True
         except Exception as e:
             print(f"[ERRO] download_music attempt '{query}': {e}")
 
@@ -158,15 +164,12 @@ def buscar_capa_do_album(musica, artista):
 
 def obter_duracao_arquivo(audio_path):
     try:
-        cmd = [
-            'ffprobe', '-v', 'error',
-            '-print_format', 'json',
-            '-show_entries', 'format=duration',
-            audio_path
-        ]
-        p = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        info = json.loads(p.stdout)
-        return float(info['format']['duration'])
+        audio = File(audio_path)
+        if audio is not None and audio.info is not None:
+            return audio.info.length
+        else:
+            print(f"[ERRO] obter_duracao_arquivo: arquivo sem info de duração: {audio_path}")
+            return 180.0
     except Exception as e:
         print(f"[ERRO] obter_duracao_arquivo: {e}")
         return 180.0  # duração padrão
