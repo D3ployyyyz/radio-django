@@ -1,18 +1,27 @@
 #!/bin/bash
 set -e
 
-# Criar pasta bin se não existir
+# Instalar unzip e curl se ainda não estiverem disponíveis
+apt-get update && apt-get install -y unzip curl
+
+# Criar pasta temporária para os binários
 mkdir -p bin
+cd bin
 
-# Baixar ffmpeg + ffprobe
-curl -L https://github.com/yt-dlp/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.zip -o ffmpeg.zip
-unzip -o ffmpeg.zip
-mv ffmpeg-master-latest-linux64-gpl/bin/ffmpeg ./bin/ffmpeg
-mv ffmpeg-master-latest-linux64-gpl/bin/ffprobe ./bin/ffprobe
-chmod +x ./bin/ffmpeg ./bin/ffprobe
+# Baixar o FFmpeg estático (exemplo: versão Linux 64 bits)
+curl -L -o ffmpeg-release.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
 
-# (Opcional) limpar arquivos temporários
-rm -rf ffmpeg.zip ffmpeg-master-latest-linux64-gpl
+# Extrair os arquivos
+tar -xf ffmpeg-release.tar.xz
+cd ffmpeg-*-static
 
-# Inicia seu app
-python app.py
+# Mover apenas os binários necessários
+cp ffmpeg ffprobe ../../bin/
+
+cd ../..
+rm -rf bin/ffmpeg-*-static ffmpeg-release.tar.xz
+
+# Tornar executáveis
+chmod +x bin/ffmpeg bin/ffprobe
+
+echo "FFmpeg instalado com sucesso em ./bin"
