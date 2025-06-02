@@ -9,21 +9,22 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-21oy1224h1#v=8668h97t#5$zm
 
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-# Permitir hosts configurados via variável de ambiente, ou localhost e Railway (exemplo)
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 INSTALLED_APPS = [
-    'radio',  # Seu app principal
+    'radio',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # WhiteNoise não precisa ser adicionado aqui
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # WhiteNoise deve vir logo após o SecurityMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -37,7 +38,7 @@ ROOT_URLCONF = 'radio_django.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],  # Templates dentro dos apps
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -52,37 +53,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'radio_django.wsgi.application'
 
-# Configuração do banco de dados via DATABASE_URL (ex: PostgreSQL no Railway)
+# Banco de dados (Railway ou SQLite local)
 DATABASES = {
     'default': dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-        # ssl_require=True  <-- remover aqui
+        conn_max_age=600
     )
 }
 
-
 AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-# Diretórios onde ficam os arquivos estáticos durante o desenvolvimento
+# Arquivos estáticos
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # para coletar em produção
 STATICFILES_DIRS = [
-    BASE_DIR / 'radio' / 'static',
+    BASE_DIR / 'radio' / 'static',  # diretório usado durante o desenvolvimento
 ]
 
-# Diretório onde o collectstatic vai copiar os arquivos estáticos para servir em produção
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # ou outro diretório fixo, fora dos apps
+# Configuração do WhiteNoise
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
