@@ -201,7 +201,7 @@ def rodar_programa(estilo, duracao_minutos):
         with status_lock:
             status_data.update({
                 "tipo": "vinheta",
-                "url": f"radio-django/radio/static/{vinheta_rel}",
+                "url": f"static/{vinheta_rel}",
                 "nome": None,
                 "artista": None,
                 "estilo": estilo,
