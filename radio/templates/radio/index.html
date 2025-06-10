@@ -5,176 +5,660 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Permissions-Policy" content="autoplay=*" />
-  <title>Rádio Online</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: white;
-      text-align: center;
-      margin: 0;
-      padding: 0;
+  <title>Rádio Êxodos</title>
+
+  <!-- Fonte monoespaçada e “pixelada” para efeito retrô -->
+  <link href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&display=swap" rel="stylesheet">
+
+
+<style>
+  /* === Variáveis de Tema === */
+  :root {
+    --bg-overlay: rgba(0, 0, 0, 0.80);
+    --neon-pink: #cc0066;
+    --neon-blue: #0099cc;
+    --text-light: #e0e0e0;
+    --text-muted: #666666;
+    --panel-bg: rgba(10, 0, 20, 0.90);
+    --border-color: #220022;
+    --font-heading: 'Major Mono Display', monospace;
+    --font-mono: 'Roboto Mono', monospace;
+  }
+
+  /* Reset */
+  *, *::before, *::after {
+    margin: 0; padding: 0; box-sizing: border-box;
+  }
+
+  /* Body com GIF + overlay escuro */
+  body {
+    position: relative;
+    min-height: 100vh;
+    font-family: var(--font-mono);
+    color: var(--text-light);
+    background: url('https://i.pinimg.com/originals/23/2b/6e/232b6e3c80eca07308c2995df4c8a0ba.gif')
+                center center / cover no-repeat fixed;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: var(--bg-overlay);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* Header */
+  header {
+    background: transparent;
+    border-bottom: none;
+    text-align: center;
+    position: relative; z-index: 1;
+    padding: 1rem 0;
+  }
+  header h1 {
+    font-family: var(--font-heading);
+    font-size: 3rem;
+    color: var(--text-light);
+    letter-spacing: 0.1em;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+    margin: 0;
+  }
+
+  /* Tipografia geral */
+  h2 {
+    font-family: var(--font-heading);
+    color: var(--neon-pink);
+    margin-bottom: 1rem;
+  }
+  p, span, li, .radio-status {
+    color: var(--text-light);
+    line-height: 1.4;
+    font-family: var(--font-mono);
+  }
+
+  /* Layout principal */
+  .main-wrapper {
+    display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 1.5rem;
+    max-width: 1200px; margin: 2rem auto 1rem; padding: 0 1rem;
+    position: relative; z-index: 1;
+  }
+
+  /* Painel Rádio */
+  .container {
+    flex: 1; min-width: 300px; max-width: 600px;
+  }
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+  }
+  .radio-status {
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .musica-info {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .album-cover {
+    width: 100%; max-width: 280px;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    background: #100010;
+  }
+  .musica-info p {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+  }
+  .musica-info p span {
+    color: var(--neon-blue);
+  }
+
+  /* Equalizador de barras (tamanho reduzido) */
+  .equalizer {
+    display: flex; justify-content: center; gap: 0.4rem;
+    margin: 1rem auto 0;
+    width: 100%; max-width: 280px;
+  }
+
+  .equalizer .bar {
+    flex: none;
+    width: 4px;    /* <— largura horizontal menor */
+    height: 20px;
+    background: var(--neon-pink);
+    animation: bar-pulse 0.8s infinite ease-in-out;
+  }
+
+  .equalizer .bar:nth-child(odd) {
+    animation-duration: 0.7s;
+  }
+  .equalizer .bar:nth-child(even) {
+    animation-duration: 0.9s;
+  }
+  @keyframes bar-pulse {
+    0%, 100% { transform: scaleY(0.4); }
+    50%      { transform: scaleY(1); }
+  }
+
+  /* Ondas Sonoras (waveform) */
+  .waveform {
+    width: 100%; max-width: 280px;
+    height: 50px;
+    margin: 1rem auto 0;
+    background: url("data:image/svg+xml,%3Csvg width='600' height='50' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,25 C50,5 150,45 200,25 C250,5 350,45 400,25 C450,5 550,45 600,25' stroke='%23cc0066' stroke-width='2' fill='none'/%3E%3C/svg%3E") repeat-x;
+    animation: wave-move 4s linear infinite;
+    filter: brightness(0.8);
+  }
+  @keyframes wave-move {
+    from { background-position: 0 0; }
+    to   { background-position: -600px 0; }
+  }
+
+  /* Cronograma */
+  .schedule-panel {
+    flex: 0 1 280px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    max-height: 500px; overflow-y: auto;
+    position: relative; z-index: 1;
+  }
+  .schedule-panel h2 {
+    font-size: 1.1rem;
+    color: var(--neon-blue);
+  }
+  .schedule-panel ul { list-style: none; }
+  .schedule-panel li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 0.85rem;
+    flex-wrap: wrap; /* permite quebra ordenada em telas menores */
+  }
+
+  .time-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    color: var(--neon-purple);
+    font-family: var(--font-mono);
+  }
+
+  .schedule-panel .show {
+    color: var(--neon-blue);
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .schedule-panel li span.time { color: var(--neon-blue);  flex-shrink: 0;}
+  .schedule-panel li span.show { color: var(--neon-pink); }
+
+  .schedule-panel li.current {
+    background-color: rgba(204, 0, 102, 0.2); /* neon-pink transparente */
+    border-left: 2px solid var(--neon-pink);
+    padding-left: 0.3rem;
+  }
+
+  /* Seção de Comentários */
+  .comments-section {
+    max-width: 1200px; margin: 1rem auto 2rem; padding: 0 1rem;
+    position: relative; z-index: 1;
+  }
+  .comments-section h2 {
+    font-size: 1.4rem; color: var(--neon-pink);
+    text-align: center; margin-bottom: 1rem;
+  }
+  .comment-form {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    display: flex; flex-direction: column; gap: 0.75rem;
+  }
+  .comment-form textarea {
+    background: #180018;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--text-light);
+    resize: vertical;
+  }
+  .comment-form button {
+    align-self: flex-end;
+    background: var(--neon-blue);
+    border: none; border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-heading);
+    color: #fff; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .comment-form button:hover { opacity: 0.8; }
+
+  .comments-list {
+    margin-top: 1.5rem;
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .comment-item {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+  .comment-item p.text {
+    font-size: 0.9rem; margin-bottom: 0.5rem;
+  }
+  .comment-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.8rem;
+  }
+  .like-button {
+    background: var(--neon-pink);
+    border: none; border-radius: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    font-family: var(--font-mono);
+    cursor: pointer; transition: opacity 0.2s;
+  }
+  .like-button:disabled { opacity: 0.5; cursor: default; }
+
+  /* Footer */
+  footer {
+    position: relative; z-index: 1;
+    text-align: center; padding: 0.75rem 0;
+    font-size: 0.8rem; color: var(--text-muted);
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* Responsivo */
+  @media (max-width: 768px) {
+    .main-wrapper { flex-direction: column; align-items: center; }
+    .schedule-panel, .container {
+      width: 100%; max-width: 600px; margin-bottom: 1.5rem;
     }
-    h1 {
-      margin-top: 50px;
-    }
-    .container {
-      margin-top: 20px;
-      padding: 0 20px;
-    }
-    .radio-status {
-      font-size: 18px;
-      margin: 20px 0;
-    }
-    .musica-info {
-      font-size: 16px;
-      margin-top: 10px;
-    }
-    .album-cover {
-      margin: 20px 0;
-      max-width: 300px;
-      max-height: 300px;
-      border-radius: 10px;
-      width: 100%;
-      height: auto;
-    }
-    #audio-player {
-      display: none;
-    }
-  </style>
+  }
+
+  #comment-input {
+  resize: none;
+}
+
+.like-button {
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.like-button.apoiado {
+  background-color: #99004d; /* cor mais escura de #cc0066 */
+  color: white;
+  animation: apoiadoPulse 0.3s ease;
+}
+
+@keyframes apoiadoPulse {
+  0% {
+    transform: scale(1);
+    background-color: #800040; /* ainda mais escura no início da animação */
+  }
+  50% {
+    transform: scale(1.1);
+    background-color: #99004d;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+
+
+</style>
+
+
 </head>
+
 <body>
-  <h1>Bem-vindo à Rádio Online!</h1>
-  <div class="container">
-    <div class="radio-status" role="status" aria-live="polite">
-      <p id="status">Carregando status da rádio...</p>
-    </div>
-    <div class="musica-info">
-      <img id="capa" class="album-cover"
-           src="https://via.placeholder.com/300?text=Sem+Capa"
-           alt="Capa do álbum"
-           width="300" height="300" />
-      <p id="musica">–</p>
-      <p id="artista">–</p>
+  <header>
+    <h1>Rádio êxodos</h1>
+  </header>
+
+  <div class="main-wrapper">
+    <!-- Painel principal da rádio -->
+    <div class="container">
+
+        <div class="musica-info">
+
+        <div class="painel-retro">
+        <div class="radio-status" role="status" aria-live="polite">
+          <p id="status">Carregando status da rádio...</p>
+        </div>
+        
+          <img
+            id="capa"
+            class="album-cover"
+            src="https://via.placeholder.com/300?text=Sem+Capa"
+            alt="Capa do álbum"
+            width="280" height="280"
+          />
+          <p id="musica"><span>Música:</span> –</p>
+          <p id="artista"><span>Artista:</span> –</p>
+        </div>
+
+        <!-- Equalizador animado -->
+        <div class="equalizer">
+          <div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div>
+        </div>
+      </div>
+
+      <audio id="audio-player" autoplay muted preload="auto">
+        <source id="audio-source" src="" type="audio/mpeg" />
+        Seu navegador não suporta áudio HTML5.
+      </audio>
     </div>
 
-    <audio id="audio-player" autoplay muted preload="auto">
-      <source id="audio-source" src="" type="audio/mpeg" />
-      Seu navegador não suporta áudio HTML5.
-    </audio>
+    <!-- Painel de Cronograma (Schedule) -->
+    <div class="schedule-panel">
+      <h2>cronograma diário</h2>
+      <ul>
+        <li><span class="time-group"><span class="time">00:00 – 02:00 |</span><span class="time">12:00 – 14:00</span></span><span class="show">Metalcore</span></li>
+        <li><span class="time-group"><span class="time">02:00 – 04:00 |</span><span class="time">14:00 – 16:00</span></span><span class="show">Rock Alternativo</span></li>
+        <li><span class="time-group"><span class="time">04:00 – 06:00 |</span><span class="time">16:00 – 18:00</span></span><span class="show">Indie</span></li>
+        <li><span class="time-group"><span class="time">06:00 – 08:00 |</span><span class="time">18:00 – 20:00</span></span><span class="show">Rock Nacional</span></li>
+        <li><span class="time-group"><span class="time">08:00 – 10:00 |</span><span class="time">20:00 – 22:00</span></span><span class="show">Publico</span></li>
+        <li><span class="time-group"><span class="time">10:00 – 12:00 |</span><span class="time">22:00 – 00:00</span></span><span class="show">Nu-Metal</span></li>
+      </ul>
+    </div>
   </div>
 
+  <!-- =======================
+       Seção de Comentários
+       ======================= -->
+  <div class="comments-section">
+    <h2>Votos dos ouvintes</h2>
+
+    <!-- Formulário para escrever um comentário -->
+    <div class="comment-form">
+      <label for="comment-input" style="font-size:0.8rem; margin-bottom:4px;">
+        Escreva seu comentário:
+      </label>
+      <textarea id="comment-input" placeholder="Digite aqui..." maxlength="200"></textarea>
+      <button id="submit-comment">enviar Voto</button>
+    </div>
+
+    <!-- Área para exibir lista de comentários -->
+    <div class="comments-list" id="comments-list">
+      {% for c in comentarios %}
+        <div class="comment-item" data-id="{{ c.id }}">
+          <p class="text">{{ c.texto }}</p>
+          <div class="comment-footer">
+            <span class="comment-points" id="pontos-{{ c.id }}">Votos: {{ c.pontos }}</span>
+            <button
+              class="like-button{% if c.id in comentApoiados %} apoiado{% endif %}"
+              id="btn-apoio-{{ c.id }}"
+              data-id="{{ c.id }}"
+            >
+              {% if c.id in comentApoiados %}Apoiado{% else %}Apoiar{% endif %}
+            </button>
+          </div>
+        </div>
+      {% empty %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <footer>
+    Rádio Êxodos • D33PLOYZZZY INC. • © 2025
+  </footer>
+
   <script>
-    const audioPlayer = document.getElementById("audio-player");
+  document.addEventListener('DOMContentLoaded', () => {
+    // === CSRF ===
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : '';
+    }
+
+    // === Local Storage ===
+    const storageKey = 'comentariosApoiados';
+    let apoiados = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+    // Ajusta classes iniciais de todos os botões
+    document.querySelectorAll('.like-button').forEach(btn => {
+      const id = parseInt(btn.dataset.id, 10);
+      if (apoiados.includes(id)) {
+        btn.classList.add('apoiado');
+        btn.textContent = 'Apoiado';
+      }
+    });
+
+    // Alterna apoio/desapoio
+    async function toggleApoio(id, apoia) {
+      const url = apoia ? '/curtir-comentario/' : '/descurtir-comentario/';
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ id })
+      });
+      if (!resp.ok) throw new Error('Falha no servidor');
+      return resp.json();
+    }
+
+    // Delegation para clique nos botões
+    document.getElementById('comments-list').addEventListener('click', async e => {
+      if (!e.target.classList.contains('like-button')) return;
+      const btn = e.target;
+      const id = parseInt(btn.dataset.id, 10);
+      const apoia = !apoiados.includes(id);
+
+      try {
+        const data = await toggleApoio(id, apoia);
+        // atualiza contador
+        document.getElementById(`pontos-${id}`).textContent = `Pontos: ${data.pontos}`;
+
+        if (apoia) {
+          apoiados.push(id);
+          btn.classList.add('apoiado');
+          btn.textContent = 'Apoiado';
+        } else {
+          apoiados = apoiados.filter(x => x !== id);
+          btn.classList.remove('apoiado');
+          btn.textContent = 'Apoiar';
+        }
+        localStorage.setItem(storageKey, JSON.stringify(apoiados));
+      } catch {
+        alert('Não foi possível alterar seu apoio.');
+      }
+    });
+
+    // === Novo Comentário ===
+    async function enviarComentario(texto) {
+      const trimmed = texto.trim();
+      if (!trimmed) {
+        alert('Comentário não pode ser vazio.');
+        return;
+      }
+      const resp = await fetch('/salvar-comentario/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ texto: trimmed })
+      });
+      const data = await resp.json();
+      if (resp.status === 400) {
+        alert(data.erro);
+      }
+      window.location.reload();
+    }
+
+    document.getElementById('submit-comment').addEventListener('click', () => {
+      enviarComentario(document.getElementById('comment-input').value);
+    });
+    document.getElementById('comment-input').addEventListener('keydown', e => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        enviarComentario(document.getElementById('comment-input').value);
+      }
+    });
+
+    // === Player de Áudio ===
+    const audioPlayer = document.getElementById('audio-player');
     const POLLING_INTERVAL = 5000;
     let ultimoStatus = null;
     let tentandoTocar = true;
-
     audioPlayer.volume = 1.0;
 
     function formatarTempo(segundos) {
-      const m = Math.floor(segundos / 60).toString().padStart(2, '0');
-      const s = Math.floor(segundos % 60).toString().padStart(2, '0');
+      const m = Math.floor(segundos/60).toString().padStart(2,'0');
+      const s = Math.floor(segundos%60).toString().padStart(2,'0');
       return `${m}:${s}`;
     }
 
-    async function atualizarDoServidor() {
-      try {
-        const resp = await fetch('/status');
-
-        if (!resp.ok) {
-          document.getElementById("status").textContent = `Erro HTTP: ${resp.status}`;
-          return;
-        }
-
-        const texto = await resp.text();
-        let data;
-        try {
-          data = JSON.parse(texto);
-        } catch (e) {
-          document.getElementById("status").textContent = "Resposta inválida do servidor: " + texto;
-          return;
-        }
-
-        let elapsed = Number(data.tempo_decorrido);
-        if (!Number.isFinite(elapsed) || elapsed < 0) elapsed = 0;
-
-        document.getElementById("status").textContent =
-          `${data.estilo} | Tocando há ${formatarTempo(elapsed)}`;
-
-        const chaveNova = JSON.stringify({
-          tipo: data.tipo,
-          url: data.url,
-          nome: data.nome,
-          artista: data.artista,
-          capa: data.capa,
-          estilo: data.estilo
-        });
-
-        if (data.tipo === 'vinheta') {
-          document.getElementById("capa").src = "https://via.placeholder.com/300?text=Vinheta";
-          document.getElementById("capa").alt = "Vinheta";
-          document.getElementById("musica").textContent = "Vinheta...";
-          document.getElementById("artista").textContent = "";
-        } else {
-          document.getElementById("capa").src = data.capa || "https://via.placeholder.com/300?text=Sem+Capa";
-          document.getElementById("capa").alt = `Capa de ${data.artista}`;
-          document.getElementById("musica").textContent = `Música: ${data.nome}`;
-          document.getElementById("artista").textContent = `Artista: ${data.artista}`;
-        }
-
-        if (!ultimoStatus || ultimoStatus !== chaveNova) {
-          const audioSource = document.getElementById("audio-source");
-          audioSource.src = data.url;
-
-          audioPlayer.onloadedmetadata = () => {
-            audioPlayer.currentTime = elapsed;
-            tentarReproduzir();
-          };
-
-          audioPlayer.load();
-          ultimoStatus = chaveNova;
-        } else {
-          const diff = Math.abs(audioPlayer.currentTime - elapsed);
-          if (diff > 1.0) {
-            audioPlayer.currentTime = elapsed;
-          }
-        }
-
-      } catch (err) {
-        console.error("Erro ao obter status:", err);
-        document.getElementById("status").textContent = "Erro ao obter status da rádio.";
-      }
+ async function atualizarDoServidor() {
+  try {
+    const resp = await fetch('/status/');
+    if (!resp.ok) {
+      document.getElementById('status').textContent = `Erro HTTP: ${resp.status}`;
+      return;
     }
+
+    const texto = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(texto);
+    } catch {
+      document.getElementById('status').textContent = 'Resposta inválida';
+      return;
+    }
+
+    let elapsed = Number(data.tempo_decorrido);
+    if (!Number.isFinite(elapsed) || elapsed < 0) elapsed = 0;
+
+    document.getElementById('status').textContent = `${data.estilo}`;
+
+    const chaveNova = JSON.stringify({
+      tipo: data.tipo,
+      url: data.url,
+      nome: data.nome,
+      artista: data.artista,
+      capa: data.capa,
+      estilo: data.estilo
+    });
+
+    if (!ultimoStatus || ultimoStatus !== chaveNova) {
+      document.getElementById('audio-source').src = data.url;
+      audioPlayer.onloadedmetadata = () => {
+        audioPlayer.currentTime = elapsed;
+        tentarReproduzir();
+      };
+      audioPlayer.load();
+      ultimoStatus = chaveNova;
+    } else {
+      const diff = Math.abs(audioPlayer.currentTime - elapsed);
+      if (diff > 1.0) audioPlayer.currentTime = elapsed;
+    }
+
+    const capaEl = document.getElementById('capa');
+    const musicaEl = document.getElementById('musica');
+    const artistaEl = document.getElementById('artista');
+
+    if (data.tipo === 'vinheta') {
+      // Oculta visualmente os elementos durante vinheta
+      capaEl.style.display = 'none';
+      musicaEl.textContent = '';
+      artistaEl.textContent = '';
+    } else {
+      capaEl.onerror = () => {
+        capaEl.src = 'https://i.gifer.com/7sBM.gif';
+      };
+      capaEl.src = data.capa || 'https://i.gifer.com/7sBM.gif';
+      capaEl.alt = `Capa de ${data.artista}`;
+      musicaEl.textContent = `Música: ${data.nome}`;
+      artistaEl.textContent = `Artista: ${data.artista}`;
+    }
+
+  } catch {
+    document.getElementById('status').textContent = 'Erro ao obter status.';
+  }
+}
+
 
     function tentarReproduzir() {
       if (!tentandoTocar) return;
-
-      audioPlayer.play().then(() => {
-        tentandoTocar = false;
-        audioPlayer.muted = false; // Ativa o som após sucesso
-      }).catch(() => {
-        // Tentativa falhou; aguardar mais interações ou tentar novamente depois
-      });
+      audioPlayer.play().then(()=>{
+        tentandoTocar=false;
+        audioPlayer.muted=false;
+      }).catch(()=>{});
     }
 
-    window.addEventListener("load", () => {
-      setInterval(atualizarDoServidor, POLLING_INTERVAL);
+    window.addEventListener('load', ()=>{
+      setInterval(atualizarDoServidor,POLLING_INTERVAL);
       atualizarDoServidor();
+      const loop=setInterval(()=>{
+        if (!tentandoTocar) clearInterval(loop);
+        else tentarReproduzir();
+      },1000);
+    });
+    document.addEventListener('pointerdown',()=>tentarReproduzir(),{once:true});
+  });
+  </script>
 
-      const loop = setInterval(() => {
-        if (!tentandoTocar) {
-          clearInterval(loop);
-          return;
-        }
-        tentarReproduzir();
-      }, 1000);
+  <script>
+  function parseTimeRange(rangeStr) {
+    const [start, end] = rangeStr.split('–').map(str => {
+      const [h, m] = str.split(':').map(Number);
+      return h * 60 + m;
+    });
+    return { start, end };
+  }
+
+  function highlightCurrentShow() {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const items = document.querySelectorAll('.schedule-panel li');
+  items.forEach(item => {
+    const timeSpans = item.querySelectorAll('.time');
+    let isCurrent = false;
+
+    timeSpans.forEach(span => {
+      if (!span.textContent.includes('–')) return; // ignora não intervalos
+
+      const cleanText = span.textContent.replace('|', '').trim();
+      const { start, end } = parseTimeRange(cleanText);
+      let adjustedEnd = end;
+      if (end <= start) adjustedEnd += 1440;
+
+      let adjustedNow = currentMinutes;
+      if (adjustedNow < start) adjustedNow += 1440;
+
+      if (adjustedNow >= start && adjustedNow < adjustedEnd) {
+        isCurrent = true;
+      }
     });
 
-    // Tentativa adicional no primeiro clique do usuário
-    document.addEventListener("pointerdown", () => {
-      tentarReproduzir();
-    }, { once: true });
-  </script>
+    if (isCurrent) {
+      item.classList.add('current');
+    } else {
+      item.classList.remove('current');
+    }
+  });
+}
+
+
+  // Atualiza ao carregar e a cada minuto
+  highlightCurrentShow();
+  setInterval(highlightCurrentShow, 60000);
+</script>
+
 </body>
 </html>
