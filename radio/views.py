@@ -140,7 +140,6 @@ def buscar_musicas_por_estilo(estilo):
     except Exception:
         return []
 
-
 def buscar_info_correta(texto):
     url = (
         f'http://ws.audioscrobbler.com/2.0/'
@@ -162,7 +161,6 @@ def buscar_info_correta(texto):
         return m.strip().title(), a.strip().title()
     return texto.strip().title(), ''
 
-
 def buscar_capa_do_album(musica, artista):
     url = (
         f'http://ws.audioscrobbler.com/2.0/'
@@ -182,7 +180,6 @@ def buscar_capa_do_album(musica, artista):
         pass
     return 'https://via.placeholder.com/300?text=Sem+Capa'
 
-
 def obter_duracao(path):
     try:
         media_info = MediaInfo.parse(path)
@@ -193,18 +190,11 @@ def obter_duracao(path):
         pass
     return 180.0
 
-
 def download_music(nome, artista, result):
     from yt_dlp import YoutubeDL
     safe = f"{artista} - {nome}".translate(str.maketrans("/\\:!?\"'", "_______"))
     out = os.path.join(settings.BASE_DIR, 'radio', 'static', 'musicas')
     os.makedirs(out, exist_ok=True)
-
-    # Caminho absoluto para cookies.txt (exportado préviamente)
-    cookies_path = os.path.join(settings.BASE_DIR, 'cookies.txt')
-    if not os.path.isfile(cookies_path):
-        raise FileNotFoundError(f"Arquivo cookies.txt não encontrado em {cookies_path}")
-
     for q in [f"{nome} {artista} official audio", f"{nome} {artista} lyrics", f"{nome} {artista}"]:
         opts = {
             'quiet': True,
@@ -215,7 +205,6 @@ def download_music(nome, artista, result):
             'audioformat': 'mp3',
             'audioquality': 192,
             'nocheckcertificate': True,
-            'cookies': cookies_path,  # <-- usa cookies para autenticação
         }
         try:
             with YoutubeDL(opts) as ydl:
@@ -228,11 +217,9 @@ def download_music(nome, artista, result):
                     if os.path.exists(alt):
                         result['path'] = alt
                         return True
-        except Exception as e:
-            print("Erro ao baixar (tentativa com cookies):", e)
+        except Exception:
             continue
     return False
-
 
 def atualizar_status(tipo, url=None, nome=None, artista=None, capa=None, estilo=None):
     with status_lock:
