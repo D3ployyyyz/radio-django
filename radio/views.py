@@ -195,35 +195,23 @@ from yt_dlp import YoutubeDL
 from django.conf import settings
 
 def download_music(nome, artista, result):
-    # Sanitiza o nome do arquivo
-    nome_seguro = f"{artista} - {nome}".translate(str.maketrans("/\\:!?\"'", "_______"))
+    from yt_dlp import YoutubeDL
+    import os
+    from django.conf import settings
 
-    # Diretório de saída
-    output_dir = os.path.join(settings.BASE_DIR, 'radio', 'static', 'musicas')
-    os.makedirs(output_dir, exist_ok=True)
+    safe = f"{artista} - {nome}".translate(str.maketrans("/\\:!?\"'", "_______"))
+    out = os.path.join(settings.BASE_DIR, 'radio', 'static', 'musicas')
+    os.makedirs(out, exist_ok=True)
 
-    # Caminho absoluto para cookies.txt (diretamente dentro de BASE_DIR)
     cookie_path = os.path.join(settings.BASE_DIR, 'cookies.txt')
 
-    # Verifica se o arquivo de cookies existe
-    if not os.path.exists(cookie_path):
-        print(f"⚠️ cookies.txt não encontrado em {cookie_path}")
-
-    # Consultas para aumentar chance de encontrar o áudio correto
-    consultas = [
-        f"{nome} {artista} official audio",
-        f"{nome} {artista} lyrics",
-        f"{nome} {artista}"
-    ]
-
-    for consulta in consultas:
-        print(f"🔎 Tentando baixar: {consulta}")
-
+    for q in [f"{nome} {artista} official audio", f"{nome} {artista} lyrics", f"{nome} {artista}"]:
         opts = {
             'quiet': True,
             'format': 'bestaudio/best',
-            'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+            'outtmpl': os.path.join(out, '%(title)s.%(ext)s'),
             'noplaylist': True,
+            'nocheckcertificate': True,
             'cookiefile': cookie_path,
             'default_search': 'ytsearch',
             'postprocessors': [
@@ -234,27 +222,20 @@ def download_music(nome, artista, result):
                 }
             ],
         }
-
         try:
             with YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(consulta, download=True)
-                entry = (info.get('entries') or [info])[0]
-                base = os.path.splitext(ydl.prepare_filename(entry))[0]
-
-                # Verifica formatos possíveis
+                info = ydl.extract_info(f"ytsearch:{q}", download=True)
+                entries = info.get('entries') or [info]
+                vid = entries[0]
+                fname = ydl.prepare_filename(vid)
                 for ext in ('.mp3', '.m4a', '.webm'):
-                    caminho = base + ext
-                    if os.path.exists(caminho):
-                        result['path'] = caminho
-                        print(f"✅ Sucesso: {caminho}")
+                    alt = os.path.splitext(fname)[0] + ext
+                    if os.path.exists(alt):
+                        result['path'] = alt
                         return True
-
-        except Exception as e:
-            print(f"❌ Erro ao baixar com query '{consulta}': {e}")
-
-    print("⚠️ Nenhuma versão foi baixada com sucesso.")
+        except Exception:
+            continue
     return False
-
 
 def atualizar_status(tipo, url=None, nome=None, artista=None, capa=None, estilo=None):
     with status_lock:
