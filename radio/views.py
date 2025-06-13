@@ -194,37 +194,39 @@ import os
 from yt_dlp import YoutubeDL
 from django.conf import settings
 
-def download_music(nome, artista, result):
-    from yt_dlp import YoutubeDL
-    import os
-    from django.conf import settings
+import os
+from yt_dlp import YoutubeDL
+from django.conf import settings
 
+def download_music(nome, artista, result):
     safe = f"{artista} - {nome}".translate(str.maketrans("/\\:!?\"'", "_______"))
     out = os.path.join(settings.BASE_DIR, 'radio', 'static', 'musicas')
     os.makedirs(out, exist_ok=True)
 
     cookie_path = os.path.join(settings.BASE_DIR, 'cookies.txt')
 
-    for q in [f"{nome} {artista} official audio", f"{nome} {artista} lyrics", f"{nome} {artista}"]:
+    queries = [
+        f"{nome} {artista} official audio",
+        f"{nome} {artista} lyrics",
+        f"{nome} {artista}",
+    ]
+
+    for q in queries:
         opts = {
             'quiet': True,
             'format': 'bestaudio/best',
             'outtmpl': os.path.join(out, '%(title)s.%(ext)s'),
             'noplaylist': True,
+            'extractaudio': True,       # legacy, não obrigatório
+            'audioformat': 'mp3',       # legacy, não obrigatório
+            'audioquality': 192,        # legacy, não obrigatório
             'nocheckcertificate': True,
             'cookiefile': cookie_path,
             'default_search': 'ytsearch',
-            'postprocessors': [
-                {
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }
-            ],
         }
         try:
             with YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(f"ytsearch:{q}", download=True)
+                info = ydl.extract_info(q, download=True)
                 entries = info.get('entries') or [info]
                 vid = entries[0]
                 fname = ydl.prepare_filename(vid)
@@ -235,7 +237,9 @@ def download_music(nome, artista, result):
                         return True
         except Exception:
             continue
+
     return False
+
 
 def atualizar_status(tipo, url=None, nome=None, artista=None, capa=None, estilo=None):
     with status_lock:
