@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e  # Para o script em qualquer erro
+set -e
 
 echo "🔧 Instalando dependências Python..."
 pip install -r requirements.txt
@@ -8,7 +8,7 @@ pip install -U yt-dlp
 echo "🗃️ Aplicando migrations do Django..."
 python manage.py migrate
 
-echo "📦 Instalando unzip e curl (caso necessário)..."
+echo "📦 Instalando unzip e curl..."
 apt-get update && apt-get install -y unzip curl
 
 echo "🎞️ Instalando FFmpeg (versão estática)..."
@@ -25,24 +25,15 @@ cd ../..
 rm -rf "$FFMPEG_DIR"/ffmpeg-*-static "$FFMPEG_DIR"/ffmpeg-release.tar.xz
 
 chmod +x "$FFMPEG_DIR"/ffmpeg "$FFMPEG_DIR"/ffprobe
-echo "✅ FFmpeg instalado com sucesso em ./$FFMPEG_DIR"
 
-echo "🍪 Verificando cookies do YouTube..."
+echo "✅ FFmpeg instalado em ./$FFMPEG_DIR"
+
+echo "🍪 Verificando presença de cookies.txt (somente para downloads)..."
 COOKIE_FILE="./cookies.txt"
 if [ ! -f "$COOKIE_FILE" ]; then
-  echo "❌ Erro: arquivo de cookies não encontrado em $COOKIE_FILE"
-  echo "💡 Exporte os cookies do YouTube com uma extensão de navegador (ex: Get cookies.txt) e salve como 'cookies.txt' na raiz do projeto."
-  exit 1
-fi
-echo "✅ cookies.txt encontrado."
-
-if [ -n "$VIDEO_URL" ]; then
-  echo "📥 Baixando vídeo/música de: $VIDEO_URL"
-  yt-dlp --cookies "$COOKIE_FILE" "$VIDEO_URL" \
-    -o "media/%(title)s.%(ext)s" \
-    --no-check-certificate
-
-  echo "✅ Download concluído com sucesso."
+  echo "⚠️ Aviso: cookies.txt não encontrado. Downloads protegidos podem falhar em runtime."
 else
-  echo "ℹ️ Nenhuma variável de ambiente VIDEO_URL definida. Pulando etapa de download."
+  echo "✅ cookies.txt disponível para autenticação em runtime"
 fi
+
+echo "🔄 Build completo. O processo de download de músicas ocorre em tempo de execução."

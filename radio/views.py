@@ -192,10 +192,25 @@ def obter_duracao(path):
 
 def download_music(nome, artista, result):
     from yt_dlp import YoutubeDL
+    import os
+
+    # Nome seguro
     safe = f"{artista} - {nome}".translate(str.maketrans("/\\:!?\"'", "_______"))
+
+    # Diretório de saída
     out = os.path.join(settings.BASE_DIR, 'radio', 'static', 'musicas')
     os.makedirs(out, exist_ok=True)
-    for q in [f"{nome} {artista} official audio", f"{nome} {artista} lyrics", f"{nome} {artista}"]:
+
+    # Caminho para cookies.txt
+    cookie_path = os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'cookies.txt'))
+
+    queries = [
+        f"{nome} {artista} official audio",
+        f"{nome} {artista} lyrics",
+        f"{nome} {artista}",
+    ]
+
+    for q in queries:
         opts = {
             'quiet': True,
             'format': 'bestaudio/best',
@@ -205,21 +220,26 @@ def download_music(nome, artista, result):
             'audioformat': 'mp3',
             'audioquality': 192,
             'nocheckcertificate': True,
+            'cookiefile': cookie_path,
+            'default_search': 'ytsearch',
         }
         try:
             with YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(f"ytsearch:{q}", download=True)
+                info = ydl.extract_info(q, download=True)
                 entries = info.get('entries') or [info]
                 vid = entries[0]
                 fname = ydl.prepare_filename(vid)
+
                 for ext in ('.mp3', '.m4a', '.webm'):
                     alt = os.path.splitext(fname)[0] + ext
                     if os.path.exists(alt):
                         result['path'] = alt
                         return True
-        except Exception:
+        except Exception as e:
+            print(f"Erro ao baixar com query '{q}': {e}")
             continue
     return False
+
 
 def atualizar_status(tipo, url=None, nome=None, artista=None, capa=None, estilo=None):
     with status_lock:
