@@ -11,6 +11,7 @@ urlpatterns = [
     path('curtir-comentario/', views.curtir_comentario, name='curtir_comentario'),
     path('descurtir-comentario/', views.descurtir_comentario, name='descurtir_comentario'),
     path('comentarios-json/', views.listar_comentarios, name='listar_comentarios'),
+    path('robots.txt', views.robots_txt, name='robots_txt'),  # ← aqui
 ]
 
 if settings.DEBUG:
