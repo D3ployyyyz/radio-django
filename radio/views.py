@@ -326,6 +326,19 @@ def ciclo_cronograma():
         rodar_programa(entry)
         time.sleep(1)
 
+# radio/views.py
+
+from django.http import HttpResponse
+
+def robots_txt(request):
+    lines = [
+        "User-Agent: *",
+        "Disallow:",
+        "Sitemap: https://radio-django-production.up.railway.app/sitemap.xml",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
+
+
 # Inicia rádio em thread separada
 thread_radio = Thread(target=ciclo_cronograma, daemon=True)
 thread_radio.start()
