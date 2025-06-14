@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from django.contrib.sitemaps.views import sitemap
 from radio.sitemaps import StaticViewSitemap  # se você tiver isso
 
